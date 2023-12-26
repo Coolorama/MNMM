@@ -1,3 +1,5 @@
+# Mixture Model you have Been Looking For
+
 import numpy as np
 import pandas as pd
 from scipy.stats import multinomial, dirichlet

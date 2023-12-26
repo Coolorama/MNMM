@@ -1,3 +1,5 @@
+# Implementation of the Mixture Model
+
 import os
 import pickle
 import numpy as np
