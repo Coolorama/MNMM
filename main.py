@@ -22,11 +22,63 @@ def get_individual_alpha_test(best_alpha, test_household_ids, train_household_id
     return alpha_test
 
 
+# def process_with_k_mixtures(args):
+#     k, X_train, X_test, train_household_ids, test_household_ids, individual_mode = args
+#     print('###################################### Experiment with %i mixture components ######################################' % k)
+
+#     # best_train_loss, log_likelihood, bic, best_alpha, best_beta = pickle.load(open(os.path.join(SAVE_DIR,'best_params_%i.p' % k), 'rb'))
+
+#     if args:
+#         try:
+#             best_train_loss, log_likelihood, bic, best_alpha, best_beta = \
+#                 pickle.load(open(os.path.join(SAVE_DIR, 'best_params_%i.p'), 'rb'))
+#             return best_train_loss, log_likelihood, bic, best_alpha, best_beta
+#         except Exception as e:
+#             print(f"Error loading data: {e}")
+
+#     if individual_mode:
+#         model = IndividualMultinomialExpectationMaximizer(k, best_alpha, best_beta, train_household_ids,
+#                                                           restarts=10, rtol=1e-4)
+#         best_train_loss, best_alpha, best_beta, best_gamma = model.fit(X_train)
+#         alpha_test = get_individual_alpha_test(best_alpha, test_household_ids, train_household_ids)
+#     else:
+#         model = MultinomialExpectationMaximizer(k, restarts=10, rtol=1e-4)
+#         best_train_loss, best_alpha, best_beta, best_gamma = model.fit(X_train)
+#         alpha_test = best_alpha
+
+#     log_likelihood = model.compute_log_likelihood(X_test, alpha_test, best_beta)
+#     bic = model.compute_bic(X_test, best_alpha, best_beta, log_likelihood)
+#     icl_bic = model.compute_icl_bic(bic, best_gamma)
+
+#     print('log likelihood for k=%i : %f' % (k, log_likelihood))
+#     print('bic for k=%i : %f' % (k, bic))
+#     print('icl bic for k=%i : %f' % (k, icl_bic))
+
+#      # Print the data before saving
+#     print("Data to be saved:")
+#     print((best_train_loss, log_likelihood, bic, best_alpha, best_beta, best_gamma))
+
+#     # Save data without try-except block for now
+#     data = (best_train_loss, log_likelihood, bic, best_alpha, best_beta, best_gamma)
+#     with open(os.path.join(SAVE_DIR, 'best_params_%i.p' % k), 'wb') as file:
+#         pickle.dump(data, file)
+
 def process_with_k_mixtures(args):
     k, X_train, X_test, train_household_ids, test_household_ids, individual_mode = args
     print('###################################### Experiment with %i mixture components ######################################' % k)
 
-    best_train_loss, log_likelihood, bic, best_alpha, best_beta = pickle.load(open('best_params_%i.p' % k, 'rb'))
+    try:
+        best_train_loss, log_likelihood, bic, best_alpha, best_beta = \
+            pickle.load(open(os.path.join(SAVE_DIR, f'best_params_{k}.p'), 'rb'))
+    except (FileNotFoundError, EOFError) as e:
+        print(f"Error loading data: {e}")
+        # If the file doesn't exist, provide default values or handle the situation accordingly
+        best_train_loss, log_likelihood, bic, best_alpha, best_beta = None, None, None, None, None
+
+    if best_train_loss is not None:
+        # The data file exists, print loaded data
+        print("Loaded data:")
+        print((best_train_loss, log_likelihood, bic, best_alpha, best_beta))
 
     if individual_mode:
         model = IndividualMultinomialExpectationMaximizer(k, best_alpha, best_beta, train_household_ids,
@@ -45,32 +97,44 @@ def process_with_k_mixtures(args):
     print('log likelihood for k=%i : %f' % (k, log_likelihood))
     print('bic for k=%i : %f' % (k, bic))
     print('icl bic for k=%i : %f' % (k, icl_bic))
-    pickle.dump((best_train_loss, log_likelihood, bic, best_alpha, best_beta, best_gamma),
-                open(os.path.join(SAVE_DIR, 'best_params_%i.p' % k), 'wb'))
+
+    # Print the data before saving
+    print("Data to be saved:")
+    print((best_train_loss, log_likelihood, bic, best_alpha, best_beta, best_gamma))
+
+    # Save data without try-except block for now
+    data = (best_train_loss, log_likelihood, bic, best_alpha, best_beta, best_gamma)
+    with open(os.path.join(SAVE_DIR, f'best_params_{k}.p'), 'wb') as file:
+        pickle.dump(data, file)
 
 
 def load_data(from_disk):
     if from_disk:
-        train_grocery_df, test_grocery_df, X_train, X_test, train_household_ids, test_household_ids = \
-            pickle.load(open(os.path.join(SAVE_DIR, 'data.p'), 'rb'))
-        return X_train, X_test, train_household_ids, test_household_ids
+        try:
+            train_grocery_df, test_grocery_df, X_train, X_test, train_household_ids, test_household_ids = \
+                pickle.load(open(os.path.join(SAVE_DIR, 'data.p'), 'rb'))
+            return X_train, X_test, train_household_ids, test_household_ids
+        except Exception as e:
+            print(f"Error loading data: {e}")
 
-    transactions_filepath = 'data/transaction_data.csv'
-    products_filepath = 'data/product.csv'
+    transactions_filepath = 'notebooks/archive/transaction_data.csv'
+    products_filepath = 'notebooks/archive/product.csv'
 
     train_grocery_df, test_grocery_df, train_counts_df, test_counts_df = DataSetPreparator.prepare(
         transactions_filepath, products_filepath)
+
     train_household_ids = train_counts_df.index.droplevel(level=1)
     test_household_ids = test_counts_df.index.droplevel(level=1)
     X_train, X_test = train_counts_df.values, test_counts_df.values
 
-    unknown_ids = set(test_household_ids).difference(set(train_household_ids))
-    X_test = X_test[~test_household_ids.isin(unknown_ids)]
-    test_household_ids = test_household_ids[~test_household_ids.isin(unknown_ids)]
+    # Print the data before saving
+    print("Data to be saved:")
+    print((train_grocery_df, test_grocery_df, train_counts_df, test_counts_df, train_household_ids, test_household_ids))
 
-    data = (
-    train_grocery_df, test_grocery_df, train_counts_df, test_counts_df, train_household_ids, test_household_ids)
-    pickle.dump(data, open(os.path.join(SAVE_DIR, 'data.p'), 'wb'))
+    # Save data without try-except block for now
+    data = (train_grocery_df, test_grocery_df, X_train, X_test, train_household_ids, test_household_ids)
+    with open(os.path.join(SAVE_DIR, 'data.p'), 'wb') as file:
+        pickle.dump(data, file)
 
     return X_train, X_test, train_household_ids, test_household_ids
 
